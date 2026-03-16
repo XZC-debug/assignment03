@@ -1,18 +1,9 @@
-"""
-    Script to transform raw AirNow data files into BigQuery-compatible formats.
-
-    This script reads the raw .dat files downloaded by 01_extract.py and converts
-    them into CSV, JSON-L, and Parquet formats suitable for loading into
-    BigQuery as external tables.
-
-    Hourly observation data is converted to: CSV, JSON-L, Parquet
-    Site location data is converted to: CSV, JSON-L, GeoParquet (with point geometry)
-
-    Usage:
-        python scripts/02_prepare.py
-"""
+"""Transform raw AirNow data into CSV, JSON-L, Parquet, and GeoParquet formats."""
 
 import pathlib
+import pandas as pd
+import geopandas as gpd
+from shapely.geometry import Point
 
 
 DATA_DIR = pathlib.Path(__file__).parent.parent / 'data'
@@ -30,98 +21,106 @@ HOURLY_COLUMNS = [
 ]
 
 
-# --- Hourly observation data ---
+def _load_hourly_data(date_str):
+    raw_dir = DATA_DIR / 'raw' / date_str
+    date_compact = date_str.replace('-', '')
+    dfs = []
+    for hour in range(24):
+        filepath = raw_dir / f'HourlyData_{date_compact}{hour:02d}.dat'
+        if filepath.exists():
+            df = pd.read_csv(
+                filepath, sep='|', header=None, names=HOURLY_COLUMNS,
+                encoding='latin-1', low_memory=False,
+            )
+            dfs.append(df)
+    return pd.concat(dfs, ignore_index=True)
+
+
+def _load_site_locations():
+    raw_dirs = sorted((DATA_DIR / 'raw').iterdir())
+    sites_path = None
+    for d in reversed(raw_dirs):
+        candidate = d / 'Monitoring_Site_Locations_V2.dat'
+        if candidate.exists():
+            sites_path = candidate
+            break
+    if sites_path is None:
+        raise FileNotFoundError("No Monitoring_Site_Locations_V2.dat found in data/raw/")
+    df = pd.read_csv(sites_path, sep='|', encoding='latin-1', low_memory=False)
+    df = df.drop_duplicates(subset=['AQSID'], keep='first')
+    return df
+
 
 def prepare_hourly_csv(date_str):
-    """Convert raw hourly .dat files for a date to a single CSV file.
-
-    Reads all 24 HourlyData_*.dat files from data/raw/<date>/,
-    combines them into a single dataset, assigns column names,
-    and writes to data/prepared/hourly/<date>.csv.
+    """Convert hourly data for a date to CSV.
 
     Args:
-        date_str: Date string in 'YYYY-MM-DD' format.
+        date_str: Date string in 'YYYY-MM-DD' format
     """
-    raise NotImplementedError("Implement this function.")
+    df = _load_hourly_data(date_str)
+    out_dir = DATA_DIR / 'prepared' / 'hourly'
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df.to_csv(out_dir / f'{date_str}.csv', index=False)
 
 
 def prepare_hourly_jsonl(date_str):
-    """Convert raw hourly .dat files for a date to newline-delimited JSON.
-
-    Reads all 24 HourlyData_*.dat files from data/raw/<date>/,
-    combines them, and writes one JSON object per line to
-    data/prepared/hourly/<date>.jsonl.
+    """Convert hourly data for a date to JSON-L.
 
     Args:
-        date_str: Date string in 'YYYY-MM-DD' format.
+        date_str: Date string in 'YYYY-MM-DD' format
     """
-    raise NotImplementedError("Implement this function.")
+    df = _load_hourly_data(date_str)
+    out_dir = DATA_DIR / 'prepared' / 'hourly'
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df.to_json(out_dir / f'{date_str}.jsonl', orient='records', lines=True)
 
 
 def prepare_hourly_parquet(date_str):
-    """Convert raw hourly .dat files for a date to Parquet format.
-
-    Reads all 24 HourlyData_*.dat files from data/raw/<date>/,
-    combines them, and writes to data/prepared/hourly/<date>.parquet.
+    """Convert hourly data for a date to Parquet.
 
     Args:
-        date_str: Date string in 'YYYY-MM-DD' format.
+        date_str: Date string in 'YYYY-MM-DD' format
     """
-    raise NotImplementedError("Implement this function.")
+    df = _load_hourly_data(date_str)
+    out_dir = DATA_DIR / 'prepared' / 'hourly'
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(out_dir / f'{date_str}.parquet', index=False)
 
-
-# --- Site location data ---
 
 def prepare_site_locations_csv():
-    """Convert monitoring site locations to CSV.
-
-    Reads the Monitoring_Site_Locations_V2.dat file, deduplicates
-    so there is one row per site (the raw file has one row per
-    site-parameter combination), and writes to
-    data/prepared/sites/site_locations.csv.
-
-    Use the most recent date's file from data/raw/.
-    """
-    raise NotImplementedError("Implement this function.")
+    """Convert site locations to CSV, deduplicated by site."""
+    df = _load_site_locations()
+    out_dir = DATA_DIR / 'prepared' / 'sites'
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df.to_csv(out_dir / 'site_locations.csv', index=False)
 
 
 def prepare_site_locations_jsonl():
-    """Convert monitoring site locations to newline-delimited JSON.
-
-    Reads the Monitoring_Site_Locations_V2.dat file, deduplicates
-    so there is one row per site (the raw file has one row per
-    site-parameter combination), and writes to
-    data/prepared/sites/site_locations.jsonl.
-
-    Use the most recent date's file from data/raw/.
-    """
-    raise NotImplementedError("Implement this function.")
+    """Convert site locations to JSON-L, deduplicated by site."""
+    df = _load_site_locations()
+    out_dir = DATA_DIR / 'prepared' / 'sites'
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df.to_json(out_dir / 'site_locations.jsonl', orient='records', lines=True)
 
 
 def prepare_site_locations_geoparquet():
-    """Convert monitoring site locations to GeoParquet with point geometry.
-
-    Reads the Monitoring_Site_Locations_V2.dat file, deduplicates
-    so there is one row per site (the raw file has one row per
-    site-parameter combination), creates point geometries from
-    latitude and longitude, and writes to
-    data/prepared/sites/site_locations.geoparquet.
-
-    Use the most recent date's file from data/raw/.
-    """
-    raise NotImplementedError("Implement this function.")
+    """Convert site locations to GeoParquet with point geometries."""
+    df = _load_site_locations()
+    geometry = [Point(lon, lat) for lon, lat in zip(df['Longitude'], df['Latitude'])]
+    gdf = gpd.GeoDataFrame(df, geometry=geometry, crs='EPSG:4326')
+    out_dir = DATA_DIR / 'prepared' / 'sites'
+    out_dir.mkdir(parents=True, exist_ok=True)
+    gdf.to_parquet(out_dir / 'site_locations.geoparquet', index=False)
 
 
 if __name__ == '__main__':
     import datetime
 
-    # Prepare site locations (only need to do this once)
     print('Preparing site locations...')
     prepare_site_locations_csv()
     prepare_site_locations_jsonl()
     prepare_site_locations_geoparquet()
 
-    # Prepare hourly data for each day in July 2024 (backfill)
     start_date = datetime.date(2024, 7, 1)
     end_date = datetime.date(2024, 7, 31)
 

@@ -11,19 +11,59 @@
 
 
 -- Hourly Observations — CSV (hive-partitioned)
--- TODO: Create external table `hourly_observations_csv_hive`
--- pointing to gs://<your-bucket>/air_quality/hourly/csv/*
--- with hive partitioning options
+CREATE OR REPLACE EXTERNAL TABLE `air_quality.hourly_observations_csv_hive`
+(
+  valid_date   STRING,
+  valid_time   STRING,
+  aqsid        STRING,
+  site_name    STRING,
+  gmt_offset   FLOAT64,
+  parameter_name STRING,
+  reporting_units STRING,
+  value        FLOAT64,
+  data_source  STRING
+)
+WITH PARTITION COLUMNS (
+  airnow_date DATE
+)
+OPTIONS (
+  format = 'CSV',
+  uris = ['gs://musa5090-s26-xzc-data/air_quality/hourly/csv/*'],
+  skip_leading_rows = 1,
+  hive_partition_uri_prefix = 'gs://musa5090-s26-xzc-data/air_quality/hourly/csv'
+);
 
 
 -- Hourly Observations — JSON-L (hive-partitioned)
--- TODO: Create external table `hourly_observations_jsonl_hive`
--- pointing to gs://<your-bucket>/air_quality/hourly/jsonl/*
--- with hive partitioning options
+CREATE OR REPLACE EXTERNAL TABLE `air_quality.hourly_observations_jsonl_hive`
+(
+  valid_date   STRING,
+  valid_time   STRING,
+  aqsid        STRING,
+  site_name    STRING,
+  gmt_offset   FLOAT64,
+  parameter_name STRING,
+  reporting_units STRING,
+  value        FLOAT64,
+  data_source  STRING
+)
+WITH PARTITION COLUMNS (
+  airnow_date DATE
+)
+OPTIONS (
+  format = 'NEWLINE_DELIMITED_JSON',
+  uris = ['gs://musa5090-s26-xzc-data/air_quality/hourly/jsonl/*'],
+  hive_partition_uri_prefix = 'gs://musa5090-s26-xzc-data/air_quality/hourly/jsonl'
+);
 
 
 -- Hourly Observations — Parquet (hive-partitioned)
--- TODO: Create external table `hourly_observations_parquet_hive`
--- pointing to gs://<your-bucket>/air_quality/hourly/parquet/*
--- with hive partitioning options
-
+CREATE OR REPLACE EXTERNAL TABLE `air_quality.hourly_observations_parquet_hive`
+WITH PARTITION COLUMNS (
+  airnow_date DATE
+)
+OPTIONS (
+  format = 'PARQUET',
+  uris = ['gs://musa5090-s26-xzc-data/air_quality/hourly/parquet/*'],
+  hive_partition_uri_prefix = 'gs://musa5090-s26-xzc-data/air_quality/hourly/parquet'
+);

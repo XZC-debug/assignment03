@@ -1,43 +1,29 @@
-"""
-    Script to upload prepared data files to Google Cloud Storage (GCS).
-
-    This script uploads the transformed files from data/prepared/ to a
-    GCS bucket, preserving the folder structure so that BigQuery can
-    use wildcard URIs to create external tables across multiple files.
-
-    Prerequisites:
-        - Run `gcloud auth application-default login` to authenticate.
-        - Create a GCS bucket (manually or in this script).
-
-    Usage:
-        python scripts/03_upload_to_gcs.py
-"""
+"""Upload prepared data files to Google Cloud Storage."""
 
 import pathlib
+from google.cloud import storage
 
 
 DATA_DIR = pathlib.Path(__file__).parent.parent / 'data'
 
-# TODO: Update this to your bucket name
-BUCKET_NAME = 'musa5090-s26-yourname-data'
+PROJECT_ID = 'cloud-to-earth'
+BUCKET_NAME = 'musa5090-s26-xzc-data'
 
 
 def upload_prepared_data():
-    """Upload all prepared data files to GCS.
+    """Upload all prepared data files to GCS."""
+    client = storage.Client(project=PROJECT_ID)
+    bucket = client.bucket(BUCKET_NAME)
 
-    Uploads the contents of data/prepared/ to the GCS bucket,
-    preserving the folder structure under a prefix of 'air_quality/'.
-
-    Expected GCS structure:
-        gs://<bucket>/air_quality/hourly/2024-07-01.csv
-        gs://<bucket>/air_quality/hourly/2024-07-01.jsonl
-        gs://<bucket>/air_quality/hourly/2024-07-01.parquet
-        ...
-        gs://<bucket>/air_quality/sites/site_locations.csv
-        gs://<bucket>/air_quality/sites/site_locations.jsonl
-        gs://<bucket>/air_quality/sites/site_locations.geoparquet
-    """
-    raise NotImplementedError("Implement this function to upload files to GCS.")
+    prepared_dir = DATA_DIR / 'prepared'
+    for local_path in sorted(prepared_dir.rglob('*')):
+        if not local_path.is_file():
+            continue
+        relative = local_path.relative_to(prepared_dir)
+        blob_name = f'air_quality/{relative.as_posix()}'
+        blob = bucket.blob(blob_name)
+        print(f'  Uploading {local_path.name} -> gs://{BUCKET_NAME}/{blob_name}')
+        blob.upload_from_filename(str(local_path))
 
 
 if __name__ == '__main__':
